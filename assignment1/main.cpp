@@ -124,7 +124,7 @@ struct LatticeMesh : public AnimatedMesh<T, 4>
     T m_gridDX;
     int m_nFrames;
 
-    static constexpr int m_pinchRadius = 1;
+    static constexpr int m_pinchRadius = 5;
 
     void initialize()
     {
@@ -147,24 +147,39 @@ struct LatticeMesh : public AnimatedMesh<T, 4>
 
         for(int node_i = 0; node_i <= m_cellSize[0]; node_i++)
         for(int node_j = 0; node_j <= m_cellSize[1]; node_j++)
-            if( std::abs(node_i - m_cellSize[0]/2) <= m_pinchRadius &&
-                std::abs(node_j - m_cellSize[1]/2) <= m_pinchRadius )
-                m_particleX.emplace_back(m_gridDX * (T)node_i, m_gridDX * (T)node_j, m_gridDX * 0.25 * (T) (m_cellSize[0]+m_cellSize[1]));
-            else
-                m_particleX.emplace_back(m_gridDX * (T)node_i, m_gridDX * (T)node_j, T());
+            // pushing points into the array
+            m_particleX.emplace_back(m_gridDX * (T)node_i, m_gridDX * (T)node_j, T());
         initializeParticles();
-
     }
 
     void prepareFrame(const int frame)
     {
-        // Nothing to do; boundary stays static
+      // Grab the side and wave it
+      float height = 0.5;
+      float speed = 0.125;
+      float zHeight = height * sin((T)frame * speed);
+      for(int node_i = 0; node_i <= m_cellSize[0]; node_i++){
+        int currID = gridToParticleID(node_i  , 0 );
+        // Update all on bottom
+        m_particleX[currID].Set(
+          m_particleX[currID].data()[0],
+          m_particleX[currID].data()[1],
+          zHeight
+        );
+        // and on top
+        currID = gridToParticleID(node_i , m_cellSize[0] );
+        m_particleX[currID].Set(
+          m_particleX[currID].data()[0],
+          m_particleX[currID].data()[1],
+          -zHeight
+        );
+      }
     }
 
-    void relaxFreeNodes()
+    void relaxFreeNodes(const int iterations)
     {
         // Relax every interior node
-        for(int iteration = 0; iteration < 100; iteration++)
+        for(int iteration = 0; iteration < iterations; iteration++)
             for(int node_i = 1; node_i < m_cellSize[0]; node_i++)
             for(int node_j = 1; node_j < m_cellSize[1]; node_j++){
 
@@ -177,6 +192,7 @@ struct LatticeMesh : public AnimatedMesh<T, 4>
                 int pPlusY  = gridToParticleID(node_i  ,node_j+1);
                 int pMinusY = gridToParticleID(node_i  ,node_j-1);
 
+                // Set the particle to be the average of it's neighbors
                 m_particleX[pCenter] = .25 * ( m_particleX[pPlusX] + m_particleX[pMinusX] + m_particleX[pPlusY] + m_particleX[pMinusY]);
             }
     }
@@ -207,11 +223,11 @@ int main(int argc, char *argv[])
     LatticeMesh<float> simulationMesh;
     simulationMesh.m_cellSize = { 40, 40 };
     simulationMesh.m_gridDX = 0.025;
-    simulationMesh.m_nFrames = 100;
+    simulationMesh.m_nFrames = 400;
 
     // Initialize the simulation example
     simulationMesh.initialize();
-    simulationMesh.relaxFreeNodes();
+    simulationMesh.relaxFreeNodes(1000);
 
     // Output the initial shape of the mesh
     simulationMesh.writeFrame(0);
