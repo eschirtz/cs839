@@ -128,7 +128,7 @@ struct LatticeMesh : public AnimatedMesh<T, 4>
 
     void initialize()
     {
-        initializeUSD("latticeMeshElasticityTest1.usda");
+        initializeUSD("demo.usda");
 
         // Create a Cartesian lattice topology
         for(int cell_i = 0; cell_i < m_cellSize[0]; cell_i++)

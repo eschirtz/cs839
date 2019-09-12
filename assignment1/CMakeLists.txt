@@ -1,17 +1,17 @@
-add_executable (latticeMeshElasticityTest1
+add_executable (demo
         main.cpp
         )
 
 find_package(PythonLibs)
 
-target_include_directories(latticeMeshElasticityTest1
+target_include_directories(demo
         PUBLIC
             ${USD_INC_DIR}
             ${PYTHON_INCLUDE_PATH}
         )
 
 target_link_libraries(
-        latticeMeshElasticityTest1
+        demo
                 ${USD_LIB_DIR}/libgf.dylib
                 ${USD_LIB_DIR}/libsdf.dylib
                 ${USD_LIB_DIR}/libtf.dylib
