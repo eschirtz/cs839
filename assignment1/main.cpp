@@ -115,14 +115,22 @@ struct LatticeMesh : public AnimatedMesh<T, 4>
 {
     using Base = AnimatedMesh<T, 4>;
     using Base::m_meshElements;
-    using Base::m_particleX;
     using Base::initializeUSD;
     using Base::initializeTopology;
     using Base::initializeParticles;
+    using Base::m_particleX; // positional data array
 
+    std::vector<GfVec3f> m_particleV; // velocity data array
     std::array<int, 2> m_cellSize; // dimensions in grid cells
     T m_gridDX;
+    // Simulation
     int m_nFrames;
+    int m_subSteps;
+    T m_timeValuePerFrame = 1;
+    // Physics
+    T m_particleMass = 0.50;
+    T m_stiffnessCoeff = 0.5;
+    T m_dampingCoeff = 0.2;
 
     static constexpr int m_pinchRadius = 5;
 
@@ -130,7 +138,7 @@ struct LatticeMesh : public AnimatedMesh<T, 4>
     {
         initializeUSD("demo.usda");
 
-        // Create a Cartesian lattice topology
+        // Create a Cartesian lattice topology ( add the elements )
         for(int cell_i = 0; cell_i < m_cellSize[0]; cell_i++)
         for(int cell_j = 0; cell_j < m_cellSize[1]; cell_j++)
             m_meshElements.emplace_back(
@@ -144,17 +152,19 @@ struct LatticeMesh : public AnimatedMesh<T, 4>
         initializeTopology();
 
         // Also initialize the associated particles
-
         for(int node_i = 0; node_i <= m_cellSize[0]; node_i++)
         for(int node_j = 0; node_j <= m_cellSize[1]; node_j++)
             // pushing points into the array
             m_particleX.emplace_back(m_gridDX * (T)node_i, m_gridDX * (T)node_j, T());
         initializeParticles();
+
+        // Also resize the velocity array to match
+        m_particleV.resize(m_particleX.size());
     }
 
     void prepareFrame(const int frame)
     {
-      // Grab the side and wave it
+      // Grab the side and wave it sinusoidally
       float height = 0.5;
       float speed = 0.125;
       float zHeight = height * sin((T)frame * speed);
@@ -166,52 +176,57 @@ struct LatticeMesh : public AnimatedMesh<T, 4>
           m_particleX[currID].data()[1],
           zHeight
         );
-        // and on top
-        currID = gridToParticleID(node_i , m_cellSize[0] );
-        m_particleX[currID].Set(
-          m_particleX[currID].data()[0],
-          m_particleX[currID].data()[1],
-          -zHeight
-        );
       }
     }
 
-    void relaxFreeNodes(const int iterations)
+    void setForceValues(std::vector<GfVec3f>& f)
     {
-        // Relax every interior node
-        for(int iteration = 0; iteration < iterations; iteration++)
-            for(int node_i = 1; node_i < m_cellSize[0]; node_i++)
-            for(int node_j = 1; node_j < m_cellSize[1]; node_j++){
+      // Must initialize every single point! Remove once fix large for loop
+      for(int i=0; i<f.size(); i++)
+        f[i] = GfVec3f(0.0,0.0,0.0);
 
-                if( std::abs(node_i - m_cellSize[0]/2) <= m_pinchRadius &&
-                    std::abs(node_j - m_cellSize[1]/2) <= m_pinchRadius ) continue;
+      for(int node_i = 1; node_i < m_cellSize[0]; node_i++)
+      for(int node_j = 1; node_j < m_cellSize[1]; node_j++){
 
-                int pCenter = gridToParticleID(node_i  ,node_j  );
-                int pPlusX  = gridToParticleID(node_i+1,node_j  );
-                int pMinusX = gridToParticleID(node_i-1,node_j  );
-                int pPlusY  = gridToParticleID(node_i  ,node_j+1);
-                int pMinusY = gridToParticleID(node_i  ,node_j-1);
+        int pCenter = gridToParticleID(node_i  ,node_j  );
+        int pPlusX  = gridToParticleID(node_i+1,node_j  );
+        int pMinusX = gridToParticleID(node_i-1,node_j  );
+        int pPlusY  = gridToParticleID(node_i  ,node_j+1);
+        int pMinusY = gridToParticleID(node_i  ,node_j-1);
+        // Manually set forces
+        f[pCenter] -= m_stiffnessCoeff * (m_particleX[pCenter] - m_particleX[pPlusX]);
+        f[pCenter] -= m_stiffnessCoeff * (m_particleX[pCenter] - m_particleX[pMinusX]);
+        f[pCenter] -= m_stiffnessCoeff * (m_particleX[pCenter] - m_particleX[pPlusY]);
+        f[pCenter] -= m_stiffnessCoeff * (m_particleX[pCenter] - m_particleX[pMinusY]);
 
-                // Set the particle to be the average of it's neighbors
-                m_particleX[pCenter] = .25 * ( m_particleX[pPlusX] + m_particleX[pMinusX] + m_particleX[pPlusY] + m_particleX[pMinusY]);
-            }
+        f[pCenter] -= m_dampingCoeff * (m_particleV[pCenter] - m_particleV[pPlusX]);
+        f[pCenter] -= m_dampingCoeff * (m_particleV[pCenter] - m_particleV[pMinusX]);
+        f[pCenter] -= m_dampingCoeff * (m_particleV[pCenter] - m_particleV[pPlusY]);
+        f[pCenter] -= m_dampingCoeff * (m_particleV[pCenter] - m_particleV[pMinusY]);
+      }
+    }
+
+    void simulateSubstep(const T dt)
+    {
+        const int nParticles = m_particleX.size();
+        std::vector<GfVec3f> forceVector(nParticles);
+        setForceValues(forceVector);
+
+        for(int p = 0; p < nParticles; p++){
+          // a=F/m, a * t = v. Add the change in velocity
+          m_particleV[p] = (dt / m_particleMass ) * forceVector[p]; //(dt / m_particleMass) * forceVector[p];
+        }
+        for(int p = 0; p < nParticles; p++){
+          // Update position
+          m_particleX[p] += dt * m_particleV[p];
+        }
     }
 
     void simulateFrame(const int frame)
     {
-        // Relax every interior node
-        for(int iteration = 0; iteration < 1; iteration++)
-            for(int node_i = 1; node_i < m_cellSize[0]; node_i++)
-            for(int node_j = 1; node_j < m_cellSize[1]; node_j++){
-
-                int pCenter = gridToParticleID(node_i  ,node_j  );
-                int pPlusX  = gridToParticleID(node_i+1,node_j  );
-                int pMinusX = gridToParticleID(node_i-1,node_j  );
-                int pPlusY  = gridToParticleID(node_i  ,node_j+1);
-                int pMinusY = gridToParticleID(node_i  ,node_j-1);
-
-                m_particleX[pCenter] = .25 * ( m_particleX[pPlusX] + m_particleX[pMinusX] + m_particleX[pPlusY] + m_particleX[pMinusY]);
-            }
+      T dT = m_timeValuePerFrame / (T) m_subSteps;
+      for(int step = 0; step < m_subSteps; step++)
+        simulateSubstep(dT);
     }
 
 private:
@@ -223,11 +238,11 @@ int main(int argc, char *argv[])
     LatticeMesh<float> simulationMesh;
     simulationMesh.m_cellSize = { 40, 40 };
     simulationMesh.m_gridDX = 0.025;
-    simulationMesh.m_nFrames = 400;
+    simulationMesh.m_nFrames = 100;
+    simulationMesh.m_subSteps = 5;
 
     // Initialize the simulation example
     simulationMesh.initialize();
-    simulationMesh.relaxFreeNodes(1000);
 
     // Output the initial shape of the mesh
     simulationMesh.writeFrame(0);
