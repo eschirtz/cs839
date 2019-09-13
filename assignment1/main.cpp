@@ -185,14 +185,14 @@ struct LatticeMesh : public AnimatedMesh<T, 4>
       for(int i=0; i<f.size(); i++)
         f[i] = GfVec3f(0.0,0.0,0.0);
 
-      for(int node_i = 1; node_i < m_cellSize[0]; node_i++)
-      for(int node_j = 1; node_j < m_cellSize[1]; node_j++){
+      for(int node_i = 0; node_i <= m_cellSize[0]; node_i++)
+      for(int node_j = 0; node_j <= m_cellSize[1]; node_j++){
 
         int pCenter = gridToParticleID(node_i  ,node_j  );
-        int pPlusX  = gridToParticleID(node_i+1,node_j  );
-        int pMinusX = gridToParticleID(node_i-1,node_j  );
-        int pPlusY  = gridToParticleID(node_i  ,node_j+1);
-        int pMinusY = gridToParticleID(node_i  ,node_j-1);
+        int pPlusX  = node_i+1 > m_cellSize[0] ? pCenter : gridToParticleID(node_i+1,node_j);
+        int pMinusX = node_i-1 < 0 ? pCenter : gridToParticleID(node_i-1,node_j);
+        int pPlusY  = node_j+1 > m_cellSize[1] ? pCenter : gridToParticleID(node_i  ,node_j+1);
+        int pMinusY = node_j-1 < 0 ? pCenter : gridToParticleID(node_i  ,node_j-1);
         // Manually set forces
         f[pCenter] -= m_stiffnessCoeff * (m_particleX[pCenter] - m_particleX[pPlusX]);
         f[pCenter] -= m_stiffnessCoeff * (m_particleX[pCenter] - m_particleX[pMinusX]);
@@ -236,9 +236,9 @@ private:
 int main(int argc, char *argv[])
 {
     LatticeMesh<float> simulationMesh;
-    simulationMesh.m_cellSize = { 40, 40 };
+    simulationMesh.m_cellSize = { 30, 30 };
     simulationMesh.m_gridDX = 0.025;
-    simulationMesh.m_nFrames = 100;
+    simulationMesh.m_nFrames = 150;
     simulationMesh.m_subSteps = 5;
 
     // Initialize the simulation example
