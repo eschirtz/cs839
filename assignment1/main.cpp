@@ -128,8 +128,8 @@ struct LatticeMesh : public AnimatedMesh<T, 4>
     int m_subSteps;
     T m_timeValuePerFrame = 1;
     // Physics
-    T m_particleMass = 0.50;
-    T m_stiffnessCoeff = 0.5;
+    T m_particleMass = 0.90;
+    T m_stiffnessCoeff = 0.75;
     T m_dampingCoeff = 0.2;
 
     static constexpr int m_pinchRadius = 5;
@@ -187,21 +187,34 @@ struct LatticeMesh : public AnimatedMesh<T, 4>
 
       for(int node_i = 0; node_i <= m_cellSize[0]; node_i++)
       for(int node_j = 0; node_j <= m_cellSize[1]; node_j++){
-
+        // Get indices of neighbors in the mesh
         int pCenter = gridToParticleID(node_i  ,node_j  );
         int pPlusX  = node_i+1 > m_cellSize[0] ? pCenter : gridToParticleID(node_i+1,node_j);
         int pMinusX = node_i-1 < 0 ? pCenter : gridToParticleID(node_i-1,node_j);
         int pPlusY  = node_j+1 > m_cellSize[1] ? pCenter : gridToParticleID(node_i  ,node_j+1);
         int pMinusY = node_j-1 < 0 ? pCenter : gridToParticleID(node_i  ,node_j-1);
-        // Manually set forces
-        f[pCenter] -= m_stiffnessCoeff * (m_particleX[pCenter] - m_particleX[pPlusX]);
-        f[pCenter] -= m_stiffnessCoeff * (m_particleX[pCenter] - m_particleX[pMinusX]);
-        f[pCenter] -= m_stiffnessCoeff * (m_particleX[pCenter] - m_particleX[pPlusY]);
-        f[pCenter] -= m_stiffnessCoeff * (m_particleX[pCenter] - m_particleX[pMinusY]);
 
+        GfVec3f diffVec;
+        GfVec3f restVec;
+        // Positive-X neighbor spring force
+        diffVec = (m_particleX[pCenter] - m_particleX[pPlusX]);
+        restVec = diffVec.GetNormalized() * m_gridDX;
+        f[pCenter] -= m_stiffnessCoeff * (diffVec - restVec);
         f[pCenter] -= m_dampingCoeff * (m_particleV[pCenter] - m_particleV[pPlusX]);
+        // Negative-X neighbor spring force
+        diffVec = (m_particleX[pCenter] - m_particleX[pMinusX]);
+        restVec = diffVec.GetNormalized() * m_gridDX;
+        f[pCenter] -= m_stiffnessCoeff * (diffVec - restVec);
         f[pCenter] -= m_dampingCoeff * (m_particleV[pCenter] - m_particleV[pMinusX]);
+        // Positive-Y neighbor spring force
+        diffVec = (m_particleX[pCenter] - m_particleX[pPlusY]);
+        restVec = diffVec.GetNormalized() * m_gridDX;
+        f[pCenter] -= m_stiffnessCoeff * (diffVec - restVec);
         f[pCenter] -= m_dampingCoeff * (m_particleV[pCenter] - m_particleV[pPlusY]);
+        // Negative-Y neighbor spring force
+        diffVec = (m_particleX[pCenter] - m_particleX[pMinusY]);
+        restVec = diffVec.GetNormalized() * m_gridDX;
+        f[pCenter] -= m_stiffnessCoeff * (diffVec - restVec);
         f[pCenter] -= m_dampingCoeff * (m_particleV[pCenter] - m_particleV[pMinusY]);
       }
     }
@@ -238,7 +251,7 @@ int main(int argc, char *argv[])
     LatticeMesh<float> simulationMesh;
     simulationMesh.m_cellSize = { 30, 30 };
     simulationMesh.m_gridDX = 0.025;
-    simulationMesh.m_nFrames = 150;
+    simulationMesh.m_nFrames = 400;
     simulationMesh.m_subSteps = 5;
 
     // Initialize the simulation example
