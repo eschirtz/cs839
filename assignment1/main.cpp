@@ -129,7 +129,7 @@ struct LatticeMesh : public AnimatedMesh<T, 4>
     T m_timeValuePerFrame = 1;
     // Physics
     T m_particleMass = 0.75;
-    T m_stiffnessCoeff = 3.0;
+    T m_stiffnessCoeff = 80.0;
     T m_dampingCoeff = 0.2;
 
     static constexpr int m_pinchRadius = 5;
@@ -166,10 +166,11 @@ struct LatticeMesh : public AnimatedMesh<T, 4>
     {
       // Grab the side and wave it sinusoidally
       float zAmp = 0.75;
-      float xAmp = 0.025;
-      float speed = 0.125;
-      float zHeight = zAmp * sin((T)frame * speed);
-      float xOffest = xAmp * sin((T)frame * speed);
+      float xAmp = 0.05;
+      float zSpeed = 0.125;
+      float xSpeed = 0.25;
+      float zHeight = zAmp * sin((T)frame * zSpeed);
+      float xOffest = xAmp * sin((T)frame * xSpeed);
       for(int node_i = 0; node_i <= m_cellSize[0]; node_i++){
         int currID = gridToParticleID(node_i  , 0 );
         // Update all on bottom
@@ -254,7 +255,7 @@ int main(int argc, char *argv[])
     simulationMesh.m_cellSize = { 30, 30 };
     simulationMesh.m_gridDX = 0.025;
     simulationMesh.m_nFrames = 200;
-    simulationMesh.m_subSteps = 10;
+    simulationMesh.m_subSteps = 20;
 
     // Initialize the simulation example
     simulationMesh.initialize();
