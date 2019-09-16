@@ -174,9 +174,10 @@ struct LatticeMesh : public AnimatedMesh<T, 4>
       float xSpeed = 0.25;
       float zHeight = zAmp * sin((T)frame * zSpeed);
       float xOffest = xAmp * sin((T)frame * xSpeed);
-      float windPush = sin((T)frame * 0.2);
-      windPush = windPush > 0 ? 0 : windPush;
+      float windPush = sin((T)frame * 0.1) + 0.25 * cos((T)frame * 0.5) + 0.15 * sin((T)frame * 0.75);
+      windPush = windPush < 0 ? 0 : windPush;
       m_wind_speed = m_wind_max_speed * (1 - m_wind_variance) + m_wind_max_speed * windPush;
+
       for(int node_i = 0; node_i <= m_cellSize[0]; node_i++){
         int currID = gridToParticleID(node_i  , 0 );
         // Update all on bottom
