@@ -128,10 +128,13 @@ struct LatticeMesh : public AnimatedMesh<T, 4>
     int m_subSteps;
     T m_timeValuePerFrame = 1;
     // Physics
-    T m_particleMass = 0.75;
-    T m_stiffnessCoeff = 80.0;
+    T m_particleMass = 0.25;
+    T m_stiffnessCoeff = 250.0;
     T m_dampingCoeff = 0.2;
-
+    T m_gravity = 4;
+    T m_wind_max_speed = 1.5;
+    T m_wind_speed = 0.85;
+    T m_wind_variance = 0.5;
     static constexpr int m_pinchRadius = 5;
 
     void initialize()
@@ -155,7 +158,7 @@ struct LatticeMesh : public AnimatedMesh<T, 4>
         for(int node_i = 0; node_i <= m_cellSize[0]; node_i++)
         for(int node_j = 0; node_j <= m_cellSize[1]; node_j++)
             // pushing points into the array
-            m_particleX.emplace_back(m_gridDX * (T)node_i, m_gridDX * (T)node_j, T());
+            m_particleX.emplace_back(m_gridDX * (T)node_i, T() , m_gridDX * (T)node_j);
         initializeParticles();
 
         // Also resize the velocity array to match
@@ -165,19 +168,22 @@ struct LatticeMesh : public AnimatedMesh<T, 4>
     void prepareFrame(const int frame)
     {
       // Grab the side and wave it sinusoidally
-      float zAmp = 0.75;
-      float xAmp = 0.05;
+      float zAmp = 0.25;
+      float xAmp = 0.25;
       float zSpeed = 0.125;
       float xSpeed = 0.25;
       float zHeight = zAmp * sin((T)frame * zSpeed);
       float xOffest = xAmp * sin((T)frame * xSpeed);
+      float windPush = sin((T)frame * 0.2);
+      windPush = windPush > 0 ? 0 : windPush;
+      m_wind_speed = m_wind_max_speed * (1 - m_wind_variance) + m_wind_max_speed * windPush;
       for(int node_i = 0; node_i <= m_cellSize[0]; node_i++){
         int currID = gridToParticleID(node_i  , 0 );
         // Update all on bottom
         m_particleX[currID].Set(
-          m_particleX[currID].data()[0] + xOffest,
+          node_i * m_gridDX,
           0.0,
-          zHeight
+          0.0
         );
       }
     }
@@ -219,6 +225,9 @@ struct LatticeMesh : public AnimatedMesh<T, 4>
         restVec = diffVec.GetNormalized() * m_gridDX;
         f[pCenter] -= m_stiffnessCoeff * (diffVec - restVec);
         f[pCenter] -= m_dampingCoeff * (m_particleV[pCenter] - m_particleV[pMinusY]);
+
+        // Add gravity & wind
+        f[pCenter] += GfVec3f(0.0, -(m_gravity * m_particleMass), -m_wind_speed);
       }
     }
 
@@ -241,8 +250,10 @@ struct LatticeMesh : public AnimatedMesh<T, 4>
     void simulateFrame(const int frame)
     {
       T dT = m_timeValuePerFrame / (T) m_subSteps;
-      for(int step = 0; step < m_subSteps; step++)
+      for(int step = 0; step < m_subSteps; step++){
         simulateSubstep(dT);
+        prepareFrame(frame);
+      }
     }
 
 private:
@@ -254,8 +265,8 @@ int main(int argc, char *argv[])
     LatticeMesh<float> simulationMesh;
     simulationMesh.m_cellSize = { 30, 30 };
     simulationMesh.m_gridDX = 0.025;
-    simulationMesh.m_nFrames = 200;
-    simulationMesh.m_subSteps = 20;
+    simulationMesh.m_nFrames = 100;
+    simulationMesh.m_subSteps = 100;
 
     // Initialize the simulation example
     simulationMesh.initialize();
