@@ -134,7 +134,7 @@ struct LatticeMesh : public AnimatedMesh<T, 4>
     T m_gravity = 4;
     T m_wind_max_speed = 1.5;
     T m_wind_speed = 0.85;
-    T m_wind_variance = 0.5;
+    T m_wind_variance = 0.75;
     static constexpr int m_pinchRadius = 5;
 
     void initialize()
@@ -174,7 +174,7 @@ struct LatticeMesh : public AnimatedMesh<T, 4>
       float xSpeed = 0.25;
       float zHeight = zAmp * sin((T)frame * zSpeed);
       float xOffest = xAmp * sin((T)frame * xSpeed);
-      float windPush = sin((T)frame * 0.1) + 0.25 * cos((T)frame * 0.5) + 0.15 * sin((T)frame * 0.75);
+      float windPush = 0.60 * sin((T)frame * 0.1) + 0.25 * cos((T)frame * 0.25) + 0.15 * sin((T)frame * 0.5);
       windPush = windPush < 0 ? 0 : windPush;
       m_wind_speed = m_wind_max_speed * (1 - m_wind_variance) + m_wind_max_speed * windPush;
 
@@ -266,7 +266,7 @@ int main(int argc, char *argv[])
     LatticeMesh<float> simulationMesh;
     simulationMesh.m_cellSize = { 30, 30 };
     simulationMesh.m_gridDX = 0.025;
-    simulationMesh.m_nFrames = 100;
+    simulationMesh.m_nFrames = 200;
     simulationMesh.m_subSteps = 100;
 
     // Initialize the simulation example
